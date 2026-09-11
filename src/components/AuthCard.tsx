@@ -3,7 +3,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { PiggyBank, Wallet } from "lucide-react";
 
-
 export const inputClass =
   "w-full rounded-xl border border-zinc-700 bg-zinc-800 py-3 pl-11 pr-4 outline-none transition placeholder:text-zinc-500 focus:border-accent-line";
 
