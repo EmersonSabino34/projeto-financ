@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowDownCircle, ArrowUpCircle, Check, X } from "lucide-react";
 
+
 import { categoriesFor } from "@/lib/categories";
 import { todayISO } from "@/lib/format";
 import type { Transaction, TransactionType } from "@/lib/types";
