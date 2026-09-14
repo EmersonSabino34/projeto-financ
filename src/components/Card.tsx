@@ -1,5 +1,6 @@
 "use client";
 
+
 import type { ComponentType, ReactNode } from "react";
 
 import { formatMoney } from "@/lib/format";
