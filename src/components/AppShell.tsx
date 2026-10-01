@@ -9,6 +9,7 @@ import { BottomNav } from "./BottomNav";
 import { Header } from "./Header";
 import { useStore } from "@/lib/store";
 
+
 /** Moldura das páginas autenticadas: guarda de sessão + Header + BottomNav. */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { ready, user } = useStore();
