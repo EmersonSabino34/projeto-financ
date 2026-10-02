@@ -3,6 +3,7 @@
 
 import { Pencil, Trash2 } from "lucide-react";
 
+
 import { findCategory } from "@/lib/categories";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
