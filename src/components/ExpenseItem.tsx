@@ -8,6 +8,7 @@ import { findCategory } from "@/lib/categories";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { Transaction } from "@/lib/types";
 
+
 type Props = {
   tx: Transaction;
   /** nome de quem lançou; só aparece em carteira com mais de uma pessoa */
