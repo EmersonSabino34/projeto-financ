@@ -10,7 +10,6 @@ export const navItems = [
   { href: "/income", label: "Receitas", icon: ArrowUpCircle },
 ];
 
-
 export function BottomNav() {
   const pathname = usePathname();
 
