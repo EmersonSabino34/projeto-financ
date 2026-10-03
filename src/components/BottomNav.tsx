@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowDownCircle, ArrowUpCircle, LayoutDashboard } from "lucide-react";
 
+
 export const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/expenses", label: "Gastos", icon: ArrowDownCircle },
