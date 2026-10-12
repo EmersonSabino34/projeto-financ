@@ -8,6 +8,7 @@ export const inputClass =
 
 /** Moldura das telas de login e registo: logo, cartão e rodapé. */
 export function AuthCard({
+
   title,
   subtitle,
   icon: Icon,
