@@ -6,6 +6,12 @@ Tailwind v4 + lucide-react, com Supabase à frente e Prisma no servidor.
 O detalhe de cada função está em
 [docs/funcoes-do-sistema.md](docs/funcoes-do-sistema.md).
 
+## Telas
+
+| Login | Cadastro | Dashboard |
+|:---:|:---:|:---:|
+| <img src="src/app/img/login.png" alt="Tela de login" width="260"> | <img src="src/app/img/cadastro.png" alt="Tela de cadastro" width="260"> | <img src="src/app/img/dashboard.png" alt="Dashboard" width="260"> |
+
 ## Estrutura
 
 ```
