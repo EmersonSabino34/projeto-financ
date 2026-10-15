@@ -10,7 +10,7 @@ O detalhe de cada função está em
 
 | Login | Cadastro | Dashboard |
 |:---:|:---:|:---:|
-| <img src="src/app/img/login.png" alt="Tela de login" width="260"> | <img src="src/app/img/cadastro.png" alt="Tela de cadastro" width="260"> | <img src="src/app/img/dashboard.png" alt="Dashboard" width="260"> |
+| <img src="src/app/image/login.png" alt="Tela de login" width="260"> | <img src="src/app/image/cadastro.png" alt="Tela de cadastro" width="260"> | <img src="src/app/image/dashboard.png" alt="Dashboard" width="260"> |
 
 ## Estrutura
 
