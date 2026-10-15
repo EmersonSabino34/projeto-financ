@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowDownCircle, ArrowUpCircle, LayoutDashboard } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, LayoutDashboard, Sparkles } from "lucide-react";
 
 export const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/expenses", label: "Gastos", icon: ArrowDownCircle },
   { href: "/income", label: "Receitas", icon: ArrowUpCircle },
+  { href: "/wishes", label: "Desejos", icon: Sparkles },
 ];
 
 export function BottomNav() {
@@ -15,7 +16,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-3">
+      <div className="mx-auto grid max-w-md grid-cols-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;

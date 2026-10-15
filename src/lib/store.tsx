@@ -10,15 +10,18 @@ import {
   type ReactNode,
 } from "react";
 
+import { authFetch } from "./api";
 import {
   isSupabaseConfigured,
   rowToTransaction,
+  rowToWish,
   supabase,
   type Household,
   type Member,
   type TransactionRow,
+  type WishRow,
 } from "./supabase";
-import type { Gender, Transaction, User } from "./types";
+import type { Gender, Transaction, User, Wish } from "./types";
 
 /**
  * Duas fontes de dados:
@@ -32,6 +35,7 @@ export const backend = isSupabaseConfigured ? "supabase" : "local";
 
 const USER_KEY = "ff.user";
 const TX_KEY = "ff.transactions";
+const WISH_KEY = "ff.wishes";
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -58,6 +62,33 @@ function seedTransactions(): Transaction[] {
   ];
 }
 
+function seedWishes(): Wish[] {
+  return [
+    {
+      id: "w1",
+      title: "Férias no Algarve",
+      price: 1200,
+      saved: 300,
+      category: "lazer",
+      priority: "alta",
+      notes: "Uma semana em agosto.",
+      targetDate: null,
+      boughtAt: null,
+    },
+    {
+      id: "w2",
+      title: "Máquina de lavar nova",
+      price: 450,
+      saved: 450,
+      category: "casa",
+      priority: "media",
+      notes: "",
+      targetDate: null,
+      boughtAt: null,
+    },
+  ];
+}
+
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -76,6 +107,37 @@ function write(key: string, value: unknown) {
 }
 
 export type TransactionInput = Omit<Transaction, "id">;
+export type WishInput = Omit<Wish, "id" | "userId">;
+
+/**
+ * Regista o acesso no servidor (data, hora, aparelho, sistema e local).
+ * 'login' = entrou agora; 'resume' = abriu com a sessão já aberta.
+ *
+ * É melhor-esforço: se falhar, ninguém fica sem entrar.
+ */
+async function reportAccess(event: "login" | "resume") {
+  if (!supabase) return;
+  try {
+    await authFetch("/api/track", {
+      method: "POST",
+      body: JSON.stringify({ event }),
+    });
+  } catch {
+    /* sem rede ou sem DATABASE_URL: o app continua igual */
+  }
+}
+
+async function fetchIsAdmin(): Promise<boolean> {
+  if (!supabase) return false;
+  try {
+    const res = await authFetch("/api/admin/me");
+    if (!res.ok) return false;
+    const body = (await res.json()) as { isAdmin?: boolean };
+    return Boolean(body.isAdmin);
+  } catch {
+    return false;
+  }
+}
 
 type Store = {
   ready: boolean;
@@ -85,6 +147,10 @@ type Store = {
   /** quem partilha a carteira, por id */
   members: Record<string, string>;
   transactions: Transaction[];
+  /** a lista de desejos da carteira */
+  wishes: Wish[];
+  /** pode abrir /admin */
+  isAdmin: boolean;
   totals: { balance: number; income: number; expense: number };
   /** null = sucesso; string = mensagem de erro para mostrar na tela */
   signIn: (email: string, password: string) => Promise<string | null>;
@@ -98,6 +164,11 @@ type Store = {
   addTransaction: (tx: TransactionInput) => Promise<void>;
   updateTransaction: (id: string, tx: TransactionInput) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
+  addWish: (wish: WishInput) => Promise<void>;
+  updateWish: (id: string, wish: WishInput) => Promise<void>;
+  removeWish: (id: string) => Promise<void>;
+  /** marca como comprado (ou volta atrás) */
+  toggleWishBought: (id: string) => Promise<void>;
   /** entra na carteira de outra pessoa pelo código do convite */
   joinHousehold: (code: string) => Promise<string | null>;
 };
@@ -110,6 +181,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [household, setHousehold] = useState<Household | null>(null);
   const [members, setMembers] = useState<Record<string, string>>({});
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [wishes, setWishes] = useState<Wish[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   /* ---------------- carregar ---------------- */
 
@@ -132,6 +205,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
 
     setTransactions((data as TransactionRow[]).map(rowToTransaction));
+  }, []);
+
+  const loadWishes = useCallback(async (householdId: string | null) => {
+    if (!supabase || !householdId) {
+      setWishes([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("wishes")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("bought_at", { ascending: true, nullsFirst: true })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Falha ao carregar os desejos:", error.message);
+      return;
+    }
+
+    setWishes((data as WishRow[]).map(rowToWish));
   }, []);
 
   /**
@@ -180,6 +274,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       user: read<User | null>(USER_KEY, null),
       transactions: read<Transaction[]>(TX_KEY, seedTransactions()),
+      wishes: read<Wish[]>(WISH_KEY, seedWishes()),
     };
   }, []);
 
@@ -192,6 +287,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         setUser(local.user);
         setTransactions(local.transactions);
+        setWishes(local.wishes);
         setReady(true);
       });
       return () => {
@@ -202,7 +298,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // modo supabase: sessão + transações do utilizador
     const client = supabase;
 
-    async function sync(userId: string | null, meta: Record<string, unknown> = {}) {
+    async function sync(
+      userId: string | null,
+      meta: Record<string, unknown> = {},
+      event: "login" | "resume" | null = null,
+    ) {
       if (!active) return;
 
       if (!userId) {
@@ -210,6 +310,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setHousehold(null);
         setMembers({});
         setTransactions([]);
+        setWishes([]);
+        setIsAdmin(false);
         setReady(true);
         return;
       }
@@ -221,29 +323,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       const householdId = await loadHousehold();
       await loadTransactions(householdId);
+      await loadWishes(householdId);
       if (active) setReady(true);
+
+      // depois de a tela estar de pé: nada disto a segura
+      if (event) void reportAccess(event);
+      void fetchIsAdmin().then((value) => {
+        if (active) setIsAdmin(value);
+      });
     }
 
     client.auth.getSession().then(({ data }) => {
       const session = data.session;
-      sync(session?.user.id ?? null, {
-        ...session?.user.user_metadata,
-        email: session?.user.email,
-      });
+      sync(
+        session?.user.id ?? null,
+        { ...session?.user.user_metadata, email: session?.user.email },
+        session ? "resume" : null,
+      );
     });
 
-    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
-      sync(session?.user.id ?? null, {
-        ...session?.user.user_metadata,
-        email: session?.user.email,
-      });
+    const { data: sub } = client.auth.onAuthStateChange((authEvent, session) => {
+      sync(
+        session?.user.id ?? null,
+        { ...session?.user.user_metadata, email: session?.user.email },
+        authEvent === "SIGNED_IN" ? "login" : null,
+      );
     });
 
     return () => {
       active = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadHousehold, loadLocal, loadTransactions]);
+  }, [loadHousehold, loadLocal, loadTransactions, loadWishes]);
 
   /* ---------------- autenticação ---------------- */
 
@@ -404,6 +515,120 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [currentScope, loadTransactions, persistLocal, transactions],
   );
 
+  /* ---------------- desejos ---------------- */
+
+  const persistWishesLocal = useCallback((next: Wish[]) => {
+    setWishes(next);
+    write(WISH_KEY, next);
+  }, []);
+
+  /** Os campos do desejo, no formato da tabela. */
+  const wishColumns = (wish: WishInput) => ({
+    title: wish.title,
+    price: wish.price,
+    saved: wish.saved,
+    category: wish.category,
+    priority: wish.priority,
+    notes: wish.notes,
+    target_date: wish.targetDate,
+    bought_at: wish.boughtAt,
+  });
+
+  const addWish = useCallback(
+    async (wish: WishInput) => {
+      if (!supabase) {
+        persistWishesLocal([{ ...wish, id: crypto.randomUUID() }, ...wishes]);
+        return;
+      }
+
+      const scope = await currentScope();
+      if (!scope) return;
+
+      const { error } = await supabase.from("wishes").insert({
+        household_id: scope.householdId,
+        user_id: scope.userId,
+        ...wishColumns(wish),
+      });
+
+      if (error) {
+        console.error("Falha ao guardar o desejo:", error.message);
+        return;
+      }
+      await loadWishes(scope.householdId);
+    },
+    [currentScope, loadWishes, persistWishesLocal, wishes],
+  );
+
+  const updateWish = useCallback(
+    async (id: string, wish: WishInput) => {
+      if (!supabase) {
+        persistWishesLocal(
+          wishes.map((w) => (w.id === id ? { ...w, ...wish, id } : w)),
+        );
+        return;
+      }
+
+      const scope = await currentScope();
+      if (!scope) return;
+
+      const { error } = await supabase
+        .from("wishes")
+        .update(wishColumns(wish))
+        .eq("id", id)
+        .eq("household_id", scope.householdId);
+
+      if (error) {
+        console.error("Falha ao editar o desejo:", error.message);
+        return;
+      }
+      await loadWishes(scope.householdId);
+    },
+    [currentScope, loadWishes, persistWishesLocal, wishes],
+  );
+
+  const removeWish = useCallback(
+    async (id: string) => {
+      if (!supabase) {
+        persistWishesLocal(wishes.filter((w) => w.id !== id));
+        return;
+      }
+
+      const scope = await currentScope();
+      if (!scope) return;
+
+      const { error } = await supabase
+        .from("wishes")
+        .delete()
+        .eq("id", id)
+        .eq("household_id", scope.householdId);
+
+      if (error) {
+        console.error("Falha ao excluir o desejo:", error.message);
+        return;
+      }
+      await loadWishes(scope.householdId);
+    },
+    [currentScope, loadWishes, persistWishesLocal, wishes],
+  );
+
+  /** Comprado: guarda a data e dá o desejo por cumprido. */
+  const toggleWishBought = useCallback(
+    async (id: string) => {
+      const wish = wishes.find((w) => w.id === id);
+      if (!wish) return;
+
+      const next: WishInput = {
+        ...wish,
+        boughtAt: wish.boughtAt ? null : new Date().toISOString(),
+        // ao comprar, o que estava guardado passa a ser o preço todo
+        saved: wish.boughtAt ? wish.saved : wish.price,
+      };
+
+      await updateWish(id, next);
+    },
+    [updateWish, wishes],
+  );
+
   const joinHousehold = useCallback(
     async (code: string): Promise<string | null> => {
       if (!supabase) return "Disponível só com o Supabase ligado.";
@@ -413,9 +638,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       const householdId = await loadHousehold();
       await loadTransactions(householdId);
+      await loadWishes(householdId);
       return null;
     },
-    [loadHousehold, loadTransactions],
+    [loadHousehold, loadTransactions, loadWishes],
   );
 
   /* ---------------- totais ---------------- */
@@ -437,6 +663,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       household,
       members,
       transactions,
+      wishes,
+      isAdmin,
       totals,
       signIn,
       signUp,
@@ -444,6 +672,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addTransaction,
       updateTransaction,
       removeTransaction,
+      addWish,
+      updateWish,
+      removeWish,
+      toggleWishBought,
       joinHousehold,
     }),
     [
@@ -452,6 +684,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       household,
       members,
       transactions,
+      wishes,
+      isAdmin,
       totals,
       signIn,
       signUp,
@@ -459,6 +693,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addTransaction,
       updateTransaction,
       removeTransaction,
+      addWish,
+      updateWish,
+      removeWish,
+      toggleWishBought,
       joinHousehold,
     ],
   );

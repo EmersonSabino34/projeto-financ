@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { Transaction } from "./types";
+import type { Priority, Transaction, Wish } from "./types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -54,5 +54,36 @@ export function rowToTransaction(row: TransactionRow): Transaction {
     description: row.description,
     category: row.category,
     date: row.date,
+  };
+}
+
+/** Uma linha da tabela `public.wishes` (ver supabase/003_desejos_e_acessos.sql). */
+export type WishRow = {
+  id: string;
+  household_id: string;
+  user_id: string | null;
+  title: string;
+  price: number | string;
+  saved: number | string;
+  category: string;
+  priority: Priority;
+  notes: string;
+  target_date: string | null;
+  bought_at: string | null;
+  created_at?: string;
+};
+
+export function rowToWish(row: WishRow): Wish {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    price: Number(row.price),
+    saved: Number(row.saved),
+    category: row.category,
+    priority: row.priority,
+    notes: row.notes ?? "",
+    targetDate: row.target_date,
+    boughtAt: row.bought_at,
   };
 }

@@ -260,3 +260,104 @@ drop policy if exists "Excluir na carteira" on public.transactions;
 create policy "Excluir na carteira"
 on public.transactions for delete
 using (household_id in (select public.my_household_ids()));
+
+-- ------------------------------------------------- desejos e acessos
+-- Igual ao 003_desejos_e_acessos.sql, repetido aqui para quem começa
+-- de um projeto vazio. Correr os dois é seguro (tudo é if not exists).
+
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
+
+create table if not exists public.wishes (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null references public.households(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  title text not null,
+  price numeric(12,2) not null,
+  saved numeric(12,2) not null default 0,
+  category text not null default 'outros',
+  priority text not null default 'media' check (priority in ('alta', 'media', 'baixa')),
+  notes text not null default '',
+  target_date date,
+  bought_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists wishes_household_idx
+  on public.wishes (household_id, bought_at, created_at desc);
+
+-- Escrita só pelo servidor (Prisma/DATABASE_URL); o navegador não insere aqui.
+create table if not exists public.access_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  occurred_at timestamptz not null default now(),
+  event text not null default 'login',
+  ip text,
+  device_type text,
+  device_model text,
+  os text,
+  browser text,
+  country text,
+  country_code text,
+  region text,
+  city text,
+  timezone text,
+  user_agent text
+);
+
+create index if not exists access_logs_user_idx
+  on public.access_logs (user_id, occurred_at desc);
+create index if not exists access_logs_recent_idx
+  on public.access_logs (occurred_at desc);
+
+alter table public.wishes enable row level security;
+alter table public.access_logs enable row level security;
+
+drop policy if exists "Ver os desejos da carteira" on public.wishes;
+create policy "Ver os desejos da carteira"
+on public.wishes for select
+using (household_id in (select public.my_household_ids()));
+
+drop policy if exists "Pedir na carteira" on public.wishes;
+create policy "Pedir na carteira"
+on public.wishes for insert
+with check (
+  household_id in (select public.my_household_ids())
+  and user_id = auth.uid()
+);
+
+drop policy if exists "Editar desejos da carteira" on public.wishes;
+create policy "Editar desejos da carteira"
+on public.wishes for update
+using (household_id in (select public.my_household_ids()));
+
+drop policy if exists "Excluir desejos da carteira" on public.wishes;
+create policy "Excluir desejos da carteira"
+on public.wishes for delete
+using (household_id in (select public.my_household_ids()));
+
+drop policy if exists "Ver os próprios acessos" on public.access_logs;
+create policy "Ver os próprios acessos"
+on public.access_logs for select
+using (user_id = auth.uid());
+
+create or replace view public.admin_users_overview
+with (security_invoker = true)
+as
+select
+  u.id,
+  u.email,
+  p.name,
+  p.gender,
+  p.is_admin,
+  u.created_at,
+  u.email_confirmed_at,
+  u.last_sign_in_at,
+  (
+    u.email_confirmed_at is not null
+    and (u.banned_until is null or u.banned_until < now())
+    and u.deleted_at is null
+  ) as is_active,
+  (select count(*) from public.access_logs a where a.user_id = u.id) as access_count
+from auth.users u
+left join public.profiles p on p.id = u.id;

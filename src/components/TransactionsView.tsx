@@ -125,7 +125,7 @@ export function TransactionsView({
 
       {deleting && (
         <ConfirmDelete
-          tx={deleting}
+          name={deleting.description}
           onCancel={() => setDeleting(null)}
           onConfirm={() => {
             removeTransaction(deleting.id);

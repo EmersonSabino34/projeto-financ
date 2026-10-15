@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, Wallet } from "lucide-react";
+import { LogOut, ShieldCheck, Wallet } from "lucide-react";
 
 import { useStore } from "@/lib/store";
 
 export function Header() {
-  const { user, signOut } = useStore();
+  const { user, isAdmin, signOut } = useStore();
   const router = useRouter();
 
   return (
@@ -22,6 +23,17 @@ export function Header() {
           </p>
           <p className="truncate text-xs text-zinc-500">Family Finance</p>
         </div>
+
+        {isAdmin && (
+          <Link
+            href="/admin"
+            aria-label="Painel admin"
+            title="Painel admin"
+            className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-900 hover:text-accent-line"
+          >
+            <ShieldCheck className="h-5 w-5" />
+          </Link>
+        )}
 
         <button
           onClick={async () => {

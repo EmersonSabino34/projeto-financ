@@ -1,0 +1,142 @@
+// Family Finance — modelo de dados.
+//
+// O Supabase continua dono do esquema: as tabelas nascem dos ficheiros em
+// `supabase/*.sql` (RLS, triggers e funções não cabem no Prisma). Aqui o
+// Prisma é apenas o ORM tipado do lado do servidor — daí `prisma generate`
+// e `prisma db pull`, nunca `prisma migrate` (ver docs/funcoes-do-sistema.md).
+
+generator client {
+  provider        = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["auth", "public"]
+}
+
+/// auth.users — gerida pelo Supabase Auth. Só de leitura para nós;
+/// é daqui que saem o email e o último login do painel admin.
+model AuthUser {
+  id              String    @id @db.Uuid
+  email           String?
+  createdAt       DateTime? @map("created_at") @db.Timestamptz(6)
+  lastSignInAt    DateTime? @map("last_sign_in_at") @db.Timestamptz(6)
+  emailConfirmedAt DateTime? @map("email_confirmed_at") @db.Timestamptz(6)
+  bannedUntil     DateTime? @map("banned_until") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  profile    Profile?
+  accessLogs AccessLog[]
+
+  @@map("users")
+  @@schema("auth")
+}
+
+model Profile {
+  id        String   @id @db.Uuid
+  name      String   @default("")
+  gender    String   @default("male")
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user AuthUser @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+  @@schema("public")
+}
+
+model Household {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @default("Nossa Família")
+  inviteCode String   @unique @map("invite_code")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  members      HouseholdMember[]
+  transactions Transaction[]
+  wishes       Wish[]
+
+  @@map("households")
+  @@schema("public")
+}
+
+model HouseholdMember {
+  householdId String   @map("household_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@id([householdId, userId])
+  @@map("household_members")
+  @@schema("public")
+}
+
+model Transaction {
+  id          String   @id @default(uuid()) @db.Uuid
+  householdId String   @map("household_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  type        String
+  amount      Decimal  @db.Decimal(12, 2)
+  description String
+  category    String   @default("outros")
+  date        DateTime @db.Date
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, date(sort: Desc), createdAt(sort: Desc)], map: "transactions_household_date_idx")
+  @@map("transactions")
+  @@schema("public")
+}
+
+/// Página de desejos: o que a família quer comprar, com o quanto já
+/// está guardado para isso. Acesso por carteira, como as transações.
+model Wish {
+  id          String    @id @default(uuid()) @db.Uuid
+  householdId String    @map("household_id") @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  title       String
+  price       Decimal   @db.Decimal(12, 2)
+  saved       Decimal   @default(0) @db.Decimal(12, 2)
+  category    String    @default("outros")
+  priority    String    @default("media")
+  notes       String    @default("")
+  targetDate  DateTime? @map("target_date") @db.Date
+  boughtAt    DateTime? @map("bought_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, boughtAt, createdAt(sort: Desc)], map: "wishes_household_idx")
+  @@map("wishes")
+  @@schema("public")
+}
+
+/// Um acesso ao sistema (login ou abertura de sessão já autenticada).
+/// Alimenta o painel admin: último login, dispositivo, SO e local.
+model AccessLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  event       String   @default("login")
+  ip          String?
+  deviceType  String?  @map("device_type")
+  deviceModel String?  @map("device_model")
+  os          String?
+  browser     String?
+  country     String?
+  countryCode String?  @map("country_code")
+  region      String?
+  city        String?
+  timezone    String?
+  userAgent   String?  @map("user_agent")
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, occurredAt(sort: Desc)], map: "access_logs_user_idx")
+  @@index([occurredAt(sort: Desc)], map: "access_logs_recent_idx")
+  @@map("access_logs")
+  @@schema("public")
+}

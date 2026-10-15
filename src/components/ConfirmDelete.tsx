@@ -4,15 +4,17 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle } from "lucide-react";
 
-import type { Transaction } from "@/lib/types";
-
-/** Confirmação de exclusão de um lançamento. */
+/** Confirmação de exclusão — de um lançamento, de um desejo, do que for. */
 export function ConfirmDelete({
-  tx,
+  heading = "Excluir lançamento?",
+  name,
   onCancel,
   onConfirm,
 }: {
-  tx: Transaction;
+  /** a pergunta, ex.: "Excluir desejo?" */
+  heading?: string;
+  /** o que vai desaparecer, mostrado entre aspas */
+  name: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -31,9 +33,9 @@ export function ConfirmDelete({
           <AlertTriangle className="h-6 w-6 text-rose-400" />
         </div>
 
-        <h2 className="text-lg font-semibold">Excluir lançamento?</h2>
+        <h2 className="text-lg font-semibold">{heading}</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          &ldquo;{tx.description}&rdquo; será removido definitivamente.
+          &ldquo;{name}&rdquo; será removido definitivamente.
         </p>
 
         <div className="mt-6 flex gap-3">
