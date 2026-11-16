@@ -17,6 +17,7 @@ export function Header() {
           <Wallet className="h-5 w-5 text-white" />
         </div>
 
+
         <div className="min-w-0 flex-1">
           <p className="truncate text-lg font-semibold">
             Olá, {user?.name ?? "visitante"} 👋
