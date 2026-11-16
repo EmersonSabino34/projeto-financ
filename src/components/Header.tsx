@@ -7,6 +7,7 @@ import { LogOut, ShieldCheck, Wallet } from "lucide-react";
 
 import { useStore } from "@/lib/store";
 
+
 export function Header() {
   const { user, isAdmin, signOut } = useStore();
   const router = useRouter();
