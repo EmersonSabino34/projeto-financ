@@ -16,6 +16,7 @@ export function AuthCard({
   children,
   footer,
 }: {
+  
   title: string;
   subtitle: string;
   icon: ComponentType<{ className?: string }>;
