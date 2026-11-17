@@ -13,8 +13,7 @@ export function AuthCard({
   icon: Icon,
   children,
   footer,
-}: {
-  
+}: { 
   title: string;
   subtitle: string;
   icon: ComponentType<{ className?: string }>;
