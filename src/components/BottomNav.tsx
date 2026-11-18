@@ -13,7 +13,6 @@ export const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
-
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur">
       <div className="mx-auto grid max-w-md grid-cols-4">
