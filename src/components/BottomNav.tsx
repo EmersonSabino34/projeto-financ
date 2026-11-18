@@ -11,7 +11,6 @@ export const navItems = [
   { href: "/wishes", label: "Desejos", icon: Sparkles },
 ];
 
-
 export function BottomNav() {
   const pathname = usePathname();
 
