@@ -10,7 +10,6 @@ export function Header() {
   const { user, isAdmin, signOut } = useStore();
   const router = useRouter();
 
-  
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-5 py-4">
