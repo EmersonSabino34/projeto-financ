@@ -1,6 +1,5 @@
 "use client";
 
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck, Wallet } from "lucide-react";
